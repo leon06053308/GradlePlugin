@@ -6,12 +6,15 @@ dependencies {
     implementation 'com.android.tools.build:gradle:3.2.1'
     //如果要实现Transform，需要引用该类
     implementation 'org.javassist:javassist:3.20.0-GA'
-    implementation files('libs/annotation.jar')
+    implementation 'com.way:annotation:1.0.0'
 }
 
 repositories {
     mavenCentral()
     jcenter()
     google()
+    maven {
+        url uri('../repo')
+    }
 }
 

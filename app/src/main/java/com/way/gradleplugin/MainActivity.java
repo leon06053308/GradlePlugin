@@ -19,10 +19,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         //android.util.Log.i("MainActivity", "onCreate");
 
-        test("test");
+        test("test", 5);
     }
 
-    @DebugLog
-    private void test(String name){
+    @DebugLog(fields = {"1"})
+    private void test(String name, int value){
     }
 }

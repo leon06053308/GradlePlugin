@@ -1,17 +1,20 @@
 package com.way.plg
 
-import com.way.annotation.DebugLog
-import com.way.annotation.InfoLog
 import com.way.plg.utils.Utils
 import com.way.plg.ware.LogLevel
 import com.way.plg.ware.LogWare
 import javassist.ClassPool
 import javassist.CtClass
 import javassist.CtMethod
+import javassist.Modifier
 import javassist.bytecode.AnnotationsAttribute
+import javassist.bytecode.CodeAttribute
+import javassist.bytecode.LocalVariableAttribute
 import javassist.bytecode.MethodInfo
 import javassist.bytecode.annotation.Annotation
 import org.gradle.api.Project
+import com.way.annotation.DebugLog
+import com.way.annotation.InfoLog
 
 
 class MyInject {
@@ -27,7 +30,7 @@ class MyInject {
 
             //project.android.bootClasspath 加入android.jar，否则找不到android相关的所有类
             pool.appendClassPath(project.android.bootClasspath[0].toString());
-            pool.importPackage("android.os.Bundle")
+            //pool.importPackage("android.os.Bundle")
 
             File dir = new File(path)
             if (!dir.isDirectory()) {
@@ -56,7 +59,9 @@ class MyInject {
 
                         String tag = Utils.getSimpleClassName(className)
                         for (CtMethod method : methods) {
-                            String methodName = method.name + "..."
+                            String[] methodParamNames = getMethodVariableName(method)
+                            println("methodParamNames: ${methodParamNames}")
+                            String methodName = method.name
                             /*Object[] annotations = method.getAnnotations()
 
                             if (annotations != null && annotations.length > 0) {
@@ -71,14 +76,33 @@ class MyInject {
                                 }
                             }*/
 
+
                             LogLevel level;
                             MethodInfo methodInfo = method.getMethodInfo()
                             AnnotationsAttribute attribute = (AnnotationsAttribute) methodInfo.getAttribute(AnnotationsAttribute.visibleTag)
                             if (attribute != null){
                                 for (Annotation annotation : attribute.getAnnotations()){
+                                    def names = annotation.getMemberNames()
+
+                                    def memberValue;
+                                    List<String> uu
                                     switch (annotation.typeName){
                                         case DebugLog.class.name:
                                             level = LogLevel.DEBUG
+                                            println("anno names: ${names}")
+
+                                            if (names != null){
+                                                memberValue = annotation.getMemberValue(names[0])
+                                                println("memberValue: ${memberValue}")
+
+                                                final List<String> values = new ArrayList<>();
+                                                memberValue.accept(new ListingMemberValueVisitor(values));
+
+                                                println("values: ${values}")
+
+                                                uu = getPrintParamsNames(methodParamNames, values)
+                                                println("uu: ${uu}")
+                                            }
                                             break
                                         case InfoLog.class.name:
                                             level = LogLevel.INFO
@@ -87,8 +111,9 @@ class MyInject {
                                             level = LogLevel.DEBUG
                                             break
                                     }
+                                    String codes = LogWare.generateLogContent(level, tag, methodName, uu)
 
-                                    String codes = LogWare.generateLogContent(level, tag, methodName)
+                                    println("codes: ${codes}")
 
                                     method.insertBefore(codes)
                                 }
@@ -116,5 +141,34 @@ class MyInject {
         }catch(Exception e){
             e.printStackTrace()
         }
+    }
+
+    static List<String> getPrintParamsNames(String[] methodParamNames, List<String> indexs){
+        List<String> temp = new ArrayList<>()
+        for (String index : indexs){
+            int k = Integer.parseInt(index)
+            temp.add(methodParamNames[k])
+        }
+
+        return temp
+    }
+
+    static String[] getMethodVariableName(CtMethod cm){
+        try{
+            MethodInfo methodInfo = cm.getMethodInfo()
+            CodeAttribute codeAttribute = methodInfo.getCodeAttribute()
+            String[] paramNames = new String[cm.getParameterTypes().length]
+            LocalVariableAttribute attr = (LocalVariableAttribute) codeAttribute.getAttribute(LocalVariableAttribute.tag)
+            if (attr != null)  {
+                int pos = Modifier.isStatic(cm.getModifiers()) ? 0 : 1
+                for (int i = 0; i < paramNames.length; i++){
+                    paramNames[i] = attr.variableName(i + pos)
+                }
+                return paramNames
+            }
+        }catch(Exception e){
+            System.out.println("getMethodVariableName fail "+e)
+        }
+        return null
     }
 }
